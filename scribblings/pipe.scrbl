@@ -1,17 +1,29 @@
 #lang scribble/manual
-@require[@for-label[(prefix-in pipe: pipe) racket/base]]
+@require[@for-label[pipe racket/base]
+                              scribble/eval
+                              pipe]
 
 @title{pipe}
-@author{sbj}
+@author{"Samuel B. Johnson"}
 
 @defmodule[pipe]
 
-@defform[(-> input application-form ...)
+@defform[(-> expr application-form ...)
              #:grammar
-             ([input expr]
-              [application-form (procedure-expr argument-expr ...)]
-              [procedure-expr procedure?]
-              [agurment-expr expr])]
-              
+             ([application-form (procedure-expr expr ...)]
+              [procedure-expr procedure?])]
 
+@defform[(->> expr application-form ...)
+             #:grammar
+             ([application-form (procedure-expr expr ...)]
+              [procedure-expr procedure?])]
 
+@defform[(>- id -> expr application-form ...)
+             #:grammar
+             ([application-form (procedure-expr expr ...)]
+              [procedure-expr procedure?])]
+
+@defform[(>>- id -> expr application-form ...)
+             #:grammar
+             ([application-form (procedure-expr expr ...)]
+              [procedure-expr procedure?])]
