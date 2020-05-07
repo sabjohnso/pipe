@@ -6,4 +6,12 @@
 
 @defmodule[pipe]
 
-Package Description Here
+@defform[(-> input application-form ...)
+             #:grammar
+             ([input expr]
+              [application-form (procedure-expr argument-expr ...)]
+              [procedure-expr procedure?]
+              [agurment-expr expr])]
+              
+
+

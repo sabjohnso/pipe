@@ -1,3 +1,3 @@
 pipe
 ====
-README text here.
+Syntax for piping values through function application forms

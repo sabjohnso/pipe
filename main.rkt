@@ -1,149 +1,95 @@
-#lang racket
+#lang racket/base
 
-(provide
+(require
+ (for-syntax racket/base racket/syntax syntax/parse))
 
- ;; Pipe the expression as the function of each of the forms
- :-
- 
- ;; Pipe the expression as the first argument of each of forms
- ;; (-> x (+ 3) (- 5))  is equivalent to (- (+ x 3) 5)
- :->
+(provide -> ->> ->< ->>)
 
- ;; Pipe an expression as the last argument of each of the forms
- ;; (->> 2 (+ 3) (- 5)) is equivalent to (- 5 (+ 3 x))
- :->>
+(define-syntax ->
+  (syntax-parser
+    [(_ x:expr)
+     #'x]
 
+    [(_ x:expr (f:expr xs:expr ...) more-forms:expr ...)
+     #'(-> (f x xs ...) more-forms ...)]))
 
+(define-syntax ->>
+  (syntax-parser
+    [(_ x:expr)
+     #'x]
 
- ;; Pipe expressions through forms concurrently as the first argument
- ;; (=> (x y) (+ 3) (- 5)) is equivalent to (values (+ x 3) (- y 5))
- :=>
-
- ;; Pipe expressions through forms concurrently as the last argument
- ;; (=>> (x y) (+ 3) (- 5)) is equivalent to (values (+ 3 x) (- 5 y))
- :=>>
-
- ;; Fanout, piping a single value concurently as the first argument
- ;; (-<=> x (+ 3) (- 5)) is equivalent to (values (+ x 3) (- x 5))
- :-<=>
-
- ;; Fanout, piping a single value concurently as the last argument
- ;; (-<=>> x (+ 3) (- 5)) is equivalent to (values (+ 3 x) (- 5 x))
- :-<=>>
-
- ;; Unsplit, pipe the values into the form, proceding the existing arguments
- ;; (=>-> (x y) (- 5)) is equivalent to (- x y 5)
- :=>->
-
- ;; Unsplit, pipe the values into the form, proceding the existing arguments
- ;; (=>->> (x y) (- 5)) is equivalent to (- 5 x y)
- :=>->>)
-
-(require racket/syntax)
-
-(define-syntax :-
-  (syntax-rules ()
-    ((_ x) x)
-    ((_ f (xs ...) forms ...)
-     (:- (f xs ...) forms ...))))
-
-(define-syntax :->
-  (syntax-rules ()
-    ((_ x) x)
-    ((_ x (f xs ...) forms ...)
-     (:-> (f x xs ...) forms ...))))
-
-(define-syntax :->>
-  (syntax-rules ()
-    ((_ x) x)
-    ((_ x (f xs ...) forms ...)
-     (:->> (f xs ... x) forms ...))))
-
-(define-syntax :=>
-  (syntax-rules ()
-    ((_ (xs ...) (f ys ...) ...)
-     (values (f xs ys ...) ...))))
-
-(define-syntax :=>>
-  (syntax-rules ()
-    ((_ (xs ...) (f ys ...) ...)
-     (values (f ys ... xs) ...))))
-
-(define-syntax (:-<=> stx)
-  (syntax-case stx ()
-    ((_ x (f ys ...) ...)
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (values (f #,var ys ...) ...))))))
-
-(define-syntax (:-<=>> stx)
-  (syntax-case stx ()
-    ((_ x (f ys ...) ...)
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (values (f ys ... #,var) ...))))))
-
-(define-syntax (:=>-> stx)
-  (syntax-case stx (values :=> :=>> :-<=> :-<=>>)
-    ((_ (values xs ...) (f ys ...))
-     #'(f xs ... ys ...))
-
-    ((_ (:=> (xs ...) (f ys ...) ...) (g zs ...))
-     #'(g (f xs ys ...) ... zs ...))
-
-    ((_ (:=>> (xs ...) (f ys ...) ...) (g zs ...))
-     #'(g (f ys ... xs) ... zs ...))
-
-    ((_ (:-<=> x (f ys ...) ...) (g zs ...))
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (g (f #,var ys ...) ... zs ...))))
-
-    ((_ (:-<=>> x (f ys ...) ...) (g zs ...))
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (g (f ys ... #,var) ... zs ...))))))
+    [(_ x:expr (f:expr xs:expr ...) more-forms:expr ...)
+     #'(->> (f xs ... x) more-forms ...)]))
 
 
-(define-syntax (:=>->> stx)
-  (syntax-case stx (values :=> :=>> :-<=> :-<=>>)
-    ((_ (values xs ...) (f ys ...))
-     #'(f xs ... ys ...))
+(define-syntax -><
+  (syntax-parser
+    [(_ x:expr)
+     #'x]
 
-    ((_ (:=> (xs ...) (f ys ...) ...) (g zs ...))
-     #'(g zs ... (f xs ys ...) ... ))
+    [(_ e:expr (f:expr xs:expr ...) ...+)
+     (with-syntax ([x (generate-temporary 'x)])
+       #'(let ([x e])
+           (values
+            (f x xs ...) ...)))]))
 
-    ((_ (:=>> (xs ...) (f ys ...) ...) (g zs ...))
-     #'(g zs ... (f ys ... xs) ...))
+(define-syntax ->><
+  (syntax-parser
+    [(_ x:expr)
+     #'x]
 
-    ((_ (:-<=> x (f ys ...) ...) (g zs ...))
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (g zs ... (f #,var ys ...) ...))))
+    [(_ e:expr (f:expr xs:expr ...) ...+)
+     (with-syntax ([x (generate-temporary 'x)])
+       #'(let ([x e])
+           (values
+            (f xs ... x) ...)))]))
 
-    ((_ (:-<=>> x (f ys ...) ...) (g zs ...))
-     (let ((var (gensym)))
-       #`(let ((#,var x))
-	   (g zs ... (f ys ... #,var) ...))))))
+
+(define-syntax >-
+  (syntax-parser
+    #:datum-literals (->)
+    
+    [(_ x:id -> e:expr)
+     #'e]
+    
+    [(_ x:id -> e:expr form:expr more-forms:expr ...)
+     #'(> x -> (let ([x e]) form) more-forms ...)]))
+
+(define-syntax >>-
+  (syntax-parser
+    #:datum-literals (->)
+    [(_ x:id xs:id ... -> e:expr)
+     #'e]
+
+    [(_ x:id xs:id ... -> e:expr form:expr forms:expr ...)
+     #'(>>- x xs ... -> (let-values ([(x xs ...) e]) form) forms ...)]))
 
 (module+ test
   (require rackunit)
+  (define (sqr x) (* x x))
 
-  (check-equal? (:-> 1)  1)
-  (check-equal? (:->> 1) 1)
+  (check-equal? (-> 'x) 'x)
+  (check-equal? (->> 'x) 'x)
+  (check-equal? (->< 'x) 'x)
+  (check-equal? (->>< 'x) 'x)
 
-  (check-equal? (:-> 1 (- 10)) -9)
-  (check-equal? (:->> 1 (- 10)) 9)
+  (check-equal? (-> 1) 1)
+  (check-equal? (-> 1 (+ 2)) 3)
+  (check-equal? (-> 1 (+ 2) (- 4)) -1)
+  (check-equal? (->> 1 (+ 2) (- 4)) 1)
 
-  (check-equal?  (:-> 10 (- 1) (- 2)) 7)
-  (check-equal?  (:->> 10 (- 1) (- 2)) 11)
+  (let ([f (compose + (λ (x) (->< x (- 3) (+ 3))))])
+    (check-equal? (f 3) 6)
+    (check-equal? (f 4) 8))
 
-  (check-equal? (call-with-values (lambda () (:=> (1 2) (+ 3) (+ 4))) list)
-		'(4 6))
-  (check-equal? (call-with-values (lambda () (:=>> (1 2) (- 3) (- 4))) list)
-		'(2 2))
+  (let ([f (compose + (λ (x) (->>< x (- 3) (+ 3))))])
+    (check-equal? (f 3) 6)
+    (check-equal? (f 4) 6))
 
-  (check-equal? (:=>-> (:=> (1 2) (+ 3) (+ 4)) (- 10)) -12)
-  (check-equal? (:=>->> (:=> (1 2) (+ 3) (+ 4)) (- 10)) 0))
-
+  (struct point (x y) #:transparent)
+  (check-equal?
+   (>>- c0 c1 -> (->< (point 3 4) (point-x) (point-y))
+        (values (sqr c0) (sqr c1))
+        (values (sqrt (+ c0 c1))))
+   5))
 
